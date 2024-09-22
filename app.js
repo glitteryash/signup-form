@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const User = require("./models/user");
 
 app.set("view engine", "ejs");
 // middlewares
@@ -9,6 +11,7 @@ app.use((req, res, next) => {
   console.log(req.method);
   next();
 });
+app.use(bodyParser.urlencoded({ extended: true }));
 
 mongoose
   .connect("mongodb://localhost:27017/test")
@@ -19,31 +22,56 @@ mongoose
     console.log(e);
   });
 
-const monkeySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    minlength: 5,
-  },
+app.get("/signup", (req, res) => {
+  res.render("signup.ejs");
 });
 
-const Monkey = mongoose.model("Monkey", monkeySchema);
-
-// 處理async需要搭配try－catch
-app.get("/", async (req, res, next) => {
+app.post("/signup", async (req, res) => {
+  let { username, password } = req.body;
+  let newUser = new User({ username, password });
   try {
-    let data = await Monkey.findOneAndUpdate(
-      { name: "JJJJJ" },
-      { name: "KKKKK" },
-      { new: true, runValidators: true }
-    );
-    if (!data) {
-      return res.status(404).send("Data is not found.");
-    }
-    res.send("Data has been updated.");
+    await newUser.save();
+    res.send("data has been saved");
   } catch (e) {
+    console.error(e);
     next(e);
   }
 });
+
+(async () => {
+  let data = await User.find();
+  if (!data) {
+    console.log("data not found");
+  } else {
+    console.log(data);
+  }
+})();
+
+// const monkeySchema = new mongoose.Schema({
+//   name: {
+//     type: String,
+//     minlength: 5,
+//   },
+// });
+
+// const Monkey = mongoose.model("Monkey", monkeySchema);
+
+// 處理async需要搭配try－catch
+// app.get("/", async (req, res, next) => {
+//   try {
+//     let data = await Monkey.findOneAndUpdate(
+//       { name: "JJJJJ" },
+//       { name: "KKKKK" },
+//       { new: true, runValidators: true }
+//     );
+//     if (!data) {
+//       return res.status(404).send("Data is not found.");
+//     }
+//     res.send("Data has been updated.");
+//   } catch (e) {
+//     next(e);
+//   }
+// });
 
 app.get("/*", (req, res) => {
   res.status(404).send("Paga not found");
