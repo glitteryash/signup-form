@@ -26,23 +26,19 @@ app.get("/", (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  res.render("login.ejs");
+  res.render("login.ejs", { error: null });
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", async (req, res, next) => {
   let { username, password } = req.body;
   try {
     let data = await User.findOne({ username });
-    if (!data) {
-      return res
-        .status(404)
-        .send("You are not menmber, yet!<br> Please sign up");
+    if (!data || password !== data.password) {
+      return res.render("login.ejs", {
+        error: "Incorrect username or password!",
+      });
     }
-    if (password == data.password) {
-      res.render("member_exclusive.ejs");
-    } else {
-      res.send(" Password not correct");
-    }
+    res.render("member_exclusive.ejs");
   } catch (e) {
     next(e);
   }
