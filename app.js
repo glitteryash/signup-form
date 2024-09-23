@@ -8,7 +8,6 @@ app.set("view engine", "ejs");
 // middlewares
 app.use(express.static("public"));
 app.use((req, res, next) => {
-  console.log(req.method);
   next();
 });
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -21,6 +20,33 @@ mongoose
   .catch((e) => {
     console.log(e);
   });
+
+app.get("/", (req, res) => {
+  res.send("Home page");
+});
+
+app.get("/login", (req, res) => {
+  res.render("login.ejs");
+});
+
+app.post("/login", async (req, res) => {
+  let { username, password } = req.body;
+  try {
+    let data = await User.findOne({ username });
+    if (!data) {
+      return res
+        .status(404)
+        .send("You are not menmber, yet!<br> Please sign up");
+    }
+    if (password == data.password) {
+      res.render("member_exclusive.ejs");
+    } else {
+      res.send(" Password not correct");
+    }
+  } catch (e) {
+    next(e);
+  }
+});
 
 app.get("/signup", (req, res) => {
   res.render("signup.ejs");
@@ -37,6 +63,15 @@ app.post("/signup", async (req, res) => {
     next(e);
   }
 });
+
+// (async () => {
+//   let data = await User.findOneAndDelete({ username: "glitteryash@try" });
+//   if (!data) {
+//     console.log("data not found");
+//   } else {
+//     console.log(data);
+//   }
+// })();
 
 (async () => {
   let data = await User.find();
