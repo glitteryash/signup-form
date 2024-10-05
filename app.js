@@ -3,16 +3,29 @@ const app = express();
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./models/user");
+const session = require("express-session");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
 app.set("view engine", "ejs");
 // middlewares
 app.use(express.static("public"));
-app.use((req, res, next) => {
-  next();
-});
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(
+  session({
+    secret: "your_secret_key",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false },
+  })
+);
+
+const requireLogin = (req, res, next) => {
+  if (!req.session.isVerified) {
+    return res.redirect("/login");
+  }
+  next();
+};
 
 mongoose
   .connect("mongodb://localhost:27017/test")
@@ -37,14 +50,15 @@ app.post("/login", async (req, res, next) => {
     let data = await User.findOne({ username });
 
     if (!data) {
-      res.render("login.ejs", {
+      return res.render("login.ejs", {
         error: "Incorrect username or password!",
       });
     }
 
     let match = await bcrypt.compare(password, data.password);
     if (match) {
-      res.render("member_exclusive.ejs");
+      req.session.isVerified = true;
+      res.redirect("/member_exclusive");
     } else {
       res.render("login.ejs", {
         error: "Incorrect username or password!",
@@ -56,26 +70,32 @@ app.post("/login", async (req, res, next) => {
   }
 });
 
+app.get("/member_exclusive", requireLogin, (req, res) => {
+  res.render("member_exclusive.ejs");
+});
+
 app.get("/signup", (req, res) => {
   res.render("signup.ejs");
 });
 
 app.post("/signup", async (req, res, next) => {
   let { username, password } = req.body;
-  bcrypt.hash(password, saltRounds, async (err, hash) => {
-    if (err) {
-      console.error(err);
-      return next(err);
+  if (!username || !password) {
+    return res.status(400).send("Username and password are required.");
+  }
+  try {
+    let foundUser = await User.findOne({ username });
+    if (foundUser) {
+      return res.send("The Username has been taken.");
     }
+    let hash = await bcrypt.hash(password, saltRounds);
     let newUser = new User({ username, password: hash });
-    try {
-      await newUser.save();
-      res.send("data has been saved");
-    } catch (err) {
-      console.error(err);
-      next(err);
-    }
-  });
+    await newUser.save();
+    res.send("data has been saved");
+  } catch (err) {
+    console.error(err);
+    next(err);
+  }
 });
 
 // (async () => {
@@ -127,7 +147,7 @@ app.post("/signup", async (req, res, next) => {
 // });
 
 app.get("/*", (req, res) => {
-  res.status(404).send("Paga not found");
+  res.status(404).send("Page not found");
 });
 
 //Error handlers
