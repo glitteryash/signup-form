@@ -3,6 +3,8 @@ const app = express();
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./models/user");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 app.set("view engine", "ejs");
 // middlewares
@@ -33,14 +35,24 @@ app.post("/login", async (req, res, next) => {
   let { username, password } = req.body;
   try {
     let data = await User.findOne({ username });
-    if (!data || password !== data.password) {
-      return res.render("login.ejs", {
+
+    if (!data) {
+      res.render("login.ejs", {
         error: "Incorrect username or password!",
       });
     }
-    res.render("member_exclusive.ejs");
-  } catch (e) {
-    next(e);
+
+    let match = await bcrypt.compare(password, data.password);
+    if (match) {
+      res.render("member_exclusive.ejs");
+    } else {
+      res.render("login.ejs", {
+        error: "Incorrect username or password!",
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    next(err);
   }
 });
 
@@ -48,16 +60,22 @@ app.get("/signup", (req, res) => {
   res.render("signup.ejs");
 });
 
-app.post("/signup", async (req, res) => {
+app.post("/signup", async (req, res, next) => {
   let { username, password } = req.body;
-  let newUser = new User({ username, password });
-  try {
-    await newUser.save();
-    res.send("data has been saved");
-  } catch (e) {
-    console.error(e);
-    next(e);
-  }
+  bcrypt.hash(password, saltRounds, async (err, hash) => {
+    if (err) {
+      console.error(err);
+      return next(err);
+    }
+    let newUser = new User({ username, password: hash });
+    try {
+      await newUser.save();
+      res.send("data has been saved");
+    } catch (err) {
+      console.error(err);
+      next(err);
+    }
+  });
 });
 
 // (async () => {
@@ -77,6 +95,10 @@ app.post("/signup", async (req, res) => {
     console.log(data);
   }
 })();
+
+// (async () => {
+//   await User.deleteOne({ username: "aa@fake.com" });
+// })();
 
 // const monkeySchema = new mongoose.Schema({
 //   name: {
